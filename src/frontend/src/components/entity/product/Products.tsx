@@ -2,6 +2,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import { useQuery } from 'react-query';
 import { api } from '../../../api/config';
+import { useCart } from '../../../context/CartContext';
 import { useTheme } from '../../../context/ThemeContext';
 
 interface Product {
@@ -27,6 +28,7 @@ export default function Products() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showModal, setShowModal] = useState(false);
   const { data: products, isLoading, error } = useQuery('products', fetchProducts);
+  const { addItem } = useCart();
   const { darkMode } = useTheme();
 
   const filteredProducts = products?.filter(
@@ -51,9 +53,10 @@ export default function Products() {
 
   const handleAddToCart = (productId: number) => {
     const quantity = quantities[productId] || 0;
-    if (quantity > 0) {
-      // TODO: Implement cart functionality
-      alert(`Added ${quantity} items to cart`);
+    const product = products?.find((item) => item.productId === productId);
+
+    if (quantity > 0 && product) {
+      addItem(product, quantity);
       setQuantities((prev) => ({
         ...prev,
         [productId]: 0,

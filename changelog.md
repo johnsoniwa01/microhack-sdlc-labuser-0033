@@ -12,6 +12,10 @@ Record pending changes under `Unreleased` and omit empty categories when publish
 
 ### Added
 
+- Implemented a working cart flow for the storefront: a cart context with local persistence, a cart page, and footer/navigation cart links.
+- Added a Python FastAPI checkout endpoint at `/api/cart/checkout` to turn cart contents into an order and order details.
+- Added backend validation coverage for the checkout flow in `src/api-py/tests/test_cart.py`.
+
 ### Changed
 
 - Rewrote the architecture and workflow guidance in [`.github/copilot-instructions.md`](.github/copilot-instructions.md) for a Python/FastAPI backend. Replaced the four-language framing and Makefile commands with `pip`, `uvicorn`, and `npm` commands, and updated review guidance to reference Pydantic instead of TypeScript.
@@ -21,6 +25,7 @@ Record pending changes under `Unreleased` and omit empty categories when publish
 - Rewrote [`src/docs/build.md`](src/docs/build.md) with `pip`, `uvicorn`, and `pytest` commands, removing multi-language Makefile targets and TypeScript API npm commands.
 - Rewrote [`src/docs/sqlite-integration.md`](src/docs/sqlite-integration.md) with Python examples using `sqlite3`, `pytest`, and `TestClient`, removing TypeScript code blocks and `api-ts` paths.
 - Updated [`Readme.md`](Readme.md) to describe a Python/FastAPI backend instead of four interchangeable API implementations and removed .NET 10 and Java 17 from the listed Dev Container prerequisites.
+- Replaced the placeholder “Add to Cart” alert behavior in [src/frontend/src/components/entity/product/Products.tsx](src/frontend/src/components/entity/product/Products.tsx) with real cart state updates.
 
 ### Deprecated
 
@@ -29,5 +34,13 @@ Record pending changes under `Unreleased` and omit empty categories when publish
 ### Fixed
 
 - Corrected Dockerfile context paths in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) from `src/api-ts` to `src/api-py`.
+- Resolved the storefront cart placeholder issue by wiring cart entry points to actual cart state and checkout logic.
 
 ### Security
+
+- Added input validation for checkout payloads to reject empty carts and invalid quantities before creating an order.
+
+### Verification
+
+- `python -m pytest tests/test_cart.py tests/test_main.py -q` in `src/api-py` — passed (3 tests).
+- `npm.cmd run build` in `src/frontend` — passed.
