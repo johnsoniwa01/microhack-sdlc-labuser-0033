@@ -81,18 +81,19 @@ jobs:
       #   (b) let the Bicep create it, then read ACR_NAME from a deployment output
       #       and split this into "provision infra" -> "build/push" -> "update apps".
       # The two build contexts and their Dockerfiles are:
-      #   - API:      context src/api-ts   Dockerfile src/api-ts/Dockerfile   (port 3000)
+      #   - API:      context src/api-py   Dockerfile src/api-py/Dockerfile   (port 3000)
       #   - Frontend: context src/frontend Dockerfile src/frontend/Dockerfile (port 80)
       - name: Build & push images to ACR
         run: |
           echo "TODO: build and push both images"
           # az acr login --name "$ACR_NAME"
           # LOGIN_SERVER="$ACR_NAME.azurecr.io"
-          # docker build -t "$LOGIN_SERVER/api:$IMAGE_TAG" -f src/api-ts/Dockerfile src/api-ts
+          # docker build -t "$LOGIN_SERVER/api:$IMAGE_TAG" -f src/api-py/Dockerfile src/api-py
           # docker build -t "$LOGIN_SERVER/frontend:$IMAGE_TAG" -f src/frontend/Dockerfile src/frontend
           # docker push "$LOGIN_SERVER/api:$IMAGE_TAG"
           # docker push "$LOGIN_SERVER/frontend:$IMAGE_TAG"
           # Tip: `az acr build` can build server-side and avoids a local docker daemon.
+
 
       # TODO: Provision (or update) the infrastructure from the Bicep skeleton.
       #       Pass the image references you just pushed. Decide how you supply

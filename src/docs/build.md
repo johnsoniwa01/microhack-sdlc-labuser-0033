@@ -1,169 +1,140 @@
 # Building and Testing the OctoCAT Supply Chain Application
 
-This guide provides instructions for building, running, and testing the OctoCAT Supply Chain Management application, which consists of an API component and a React Frontend.
+This guide provides instructions for building, running, and testing the OctoCAT Supply Chain Management application, which consists of a **Python FastAPI** backend and a **React + Vite** frontend.
 
 ## Prerequisites
 
-- Node.js (version 18 or higher)
-- npm (latest version recommended)
-- Docker/Podman (optional, for containerization)
+- **Python 3.11+** and `pip`
+- **Node.js 18+** and `npm`
+- Docker / Podman (optional, for containerized deployment)
 
 ## Installation
 
-1. Clone the repository
-2. Install dependencies:
+### Backend (Python API)
 
 ```bash
-make install
+cd src/api-py
+pip install -r requirements.txt
 ```
 
-## Building the Application
-
-### Using Make Commands
-
-You can build the entire application or its individual components using the following commands:
+### Frontend
 
 ```bash
-# Build both API and Frontend components
-make build
-
-# Build only the TypeScript API component
-make build-ts
-
-# Build only the Frontend component
-make build-frontend
+cd src/frontend
+npm install
 ```
-
-Alternatively, if you're in the `api-ts/` or `frontend/` directories, you can use npm commands directly:
-
-```bash
-cd api-ts && npm run build
-cd frontend && npm run build
-```
-
-### Database management
-
-```bash
-# Initialize DB schema (runs migrations)
-make db-init
-
-# Seed sample data
-make db-seed
-```
-
-Alternatively, if you're in the `api-ts/` directory, you can use npm commands directly:
-
-```bash
-cd api-ts
-npm run db:init
-npm run db:seed
-```
-
-Environment variables:
-
-- DB_FILE: path to SQLite database file (default: `api-ts/data/app.db`)
-- DB_ENABLE_WAL: enable WAL mode (default: true)
-- DB_FOREIGN_KEYS: enforce foreign keys (default: true)
-- DB_TIMEOUT: busy timeout in ms (default: 30000)
-
-### Using VS Code Tasks
-
-VS Code tasks have been configured to streamline the build process:
-
-1. Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS) to open the Command Palette
-2. Type `Tasks: Run Task` and select it
-3. Choose from the following tasks:
-   - `Build All`: Builds both API and Frontend components
-   - `Build API`: Builds only the API component
-   - `Build Frontend`: Builds only the Frontend component
-
-Alternatively, you can press `Ctrl+Shift+B` (or `Cmd+Shift+B` on macOS) to run the default build task (`Build All`).
 
 ## Running the Application
 
-### Using Make Commands
+### Backend — dev mode (hot reload)
 
 ```bash
-# Start both API and Frontend in development mode with hot reloading
-make dev
-
-# Start only the TypeScript API in development mode
-make dev-api-ts
-
-# Start only the Frontend in development mode
-make dev-frontend
-
-# Start the application in production mode
-make start
+cd src/api-py
+uvicorn main:app --reload --port 3000
 ```
 
-Alternatively, if you're in the `api-ts/` or `frontend/` directories, you can use npm commands directly:
+The API will be available at `http://localhost:3000`.  
+OpenAPI docs: `http://localhost:3000/docs`
+
+### Frontend — dev mode
 
 ```bash
-cd api-ts && npm run dev
-cd frontend && npm run dev
+cd src/frontend
+npm run dev
 ```
 
-### Using VS Code Debugger
+The frontend runs on `http://localhost:5173` by default.
 
-1. Open the Debug panel (`Ctrl+Shift+D` or `Cmd+Shift+D` on macOS)
-2. Select `Start API & Frontend` from the dropdown menu
-3. Click the green play button or press F5
+## Database Management
 
-This will start both the API and Frontend in development mode with the integrated terminal, allowing you to see the console output.
-
-## Testing the Application
-
-### Running Tests
+The API runs migrations and seeds automatically on startup. To trigger manually:
 
 ```bash
-# Run all tests
-make test
-
-# Run TypeScript API tests only
-make test-ts
-
-# Run frontend tests only
-make test-frontend
+# From src/api-py/
+python -c "from utils.db import init_db; init_db()"
 ```
 
-Alternatively, if you're in the `api-ts/` or `frontend/` directories, you can use npm commands directly:
+### Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `3000` | API listening port |
+| `DB_FILE` | `./data/app.db` | Path to SQLite database file |
+| `API_CORS_ORIGINS` | _(unset)_ | Comma-separated CORS origin override |
+| `DB_MIGRATIONS_DIR` | `../database/migrations` | Override migrations directory |
+
+## Building for Production
+
+### API (Docker)
 
 ```bash
-cd api-ts && npm run test
-cd frontend && npm run test
+docker build -t octocat-api -f src/api-py/Dockerfile src/api-py
+```
+
+### Frontend (Docker)
+
+```bash
+docker build -t octocat-frontend -f src/frontend/Dockerfile src/frontend
+```
+
+### Running with Docker Compose
+
+```bash
+docker-compose up --build
+```
+
+## Testing
+
+### Backend unit & integration tests
+
+```bash
+cd src/api-py
+pytest
+```
+
+Tests use an in-memory SQLite database (`:memory:`), so no file cleanup is needed.
+
+### Frontend tests
+
+```bash
+cd src/frontend
+npm run test
+```
+
+### End-to-end (Playwright)
+
+```bash
+cd src/frontend
+npm run test:e2e
 ```
 
 ### Linting
 
 ```bash
-# Run linting checks
-make lint
+# Frontend
+cd src/frontend && npm run lint
+
+# Python (if configured)
+cd src/api-py && ruff check .
 ```
 
-Alternatively, if you're in the `api-ts/` or `frontend/` directory, you can use npm commands directly:
+## Port Configuration
 
-```bash
-cd frontend && npm run lint
-```
+| Service | Default port |
+|---|---|
+| Python API | `3000` |
+| Frontend (dev) | `5173` |
+| Frontend (Docker) | `80` → mapped to `3001` in compose |
 
-```bash
-cd api-ts && npm run lint
-```
+When running in **GitHub Codespaces**, set the API port visibility to `public` to avoid CORS errors from the frontend.
 
-## Additional Information
+## VS Code Tasks
 
-### Port Configuration
+VS Code tasks are preconfigured for common operations:
 
-The API runs on port 3000 by default, and the Frontend runs on port 5137. When running in a Codespace environment, ensure that the API port visibility is set to `public` to avoid CORS errors when the Frontend tries to communicate with the API.
-
-For Docker, the sample compose maps API to 3000 and frontend to 3001.
-
-### Docker Deployment
-
-The project includes Dockerfiles for both API and Frontend components and a docker-compose.yml file for easy containerized deployment:
-
-```bash
-# Build and start using Docker Compose
-docker-compose up --build
-```
+1. Open the Command Palette (`Ctrl+Shift+P`) → **Tasks: Run Task**
+2. Choose from:
+   - `Start API` — starts the FastAPI backend with hot reload
+   - `Start Frontend` — starts the Vite dev server
+   - `Start All` — starts both concurrently
+3. Or press `Ctrl+Shift+B` to run the default build task.

@@ -1,6 +1,6 @@
 ---
-description: "Guidance for editing and reviewing database schema changes in the API."
-applyTo: "src/database/migrations/**, src/database/seed/**, src/api-ts/src/db/**"
+description: "Guidance for editing and reviewing database schema changes in the Python API."
+applyTo: "src/database/migrations/**, src/database/seed/**, src/api-py/**"
 ---
 # Database & Schema Review Guidance
 Specialized guidance for SQLite schema evolution, migrations, and seed strategy.

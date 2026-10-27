@@ -1,75 +1,55 @@
 # SQLite Database Integration
 
-This document explains how to use the SQLite database integration in the OctoCAT Supply Chain Management API.
+This document explains how the SQLite database is integrated in the **OctoCAT Supply Chain Python/FastAPI API**.
 
 ## Overview
 
-The API has been migrated from in-memory data storage to a persistent SQLite database. This provides:
+The API uses SQLite as its persistence layer, accessed directly via Python's built-in `sqlite3` module through a lightweight repository pattern. This provides:
 
-- **Data persistence** - Data survives server restarts
-- **ACID transactions** - Reliable data consistency
-- **Proper relationships** - Foreign key constraints between entities
-- **Performance** - Indexed queries for better performance
-- **Testing** - In-memory database for unit tests
+- **Data persistence** — data survives server restarts
+- **ACID transactions** — reliable data consistency
+- **Proper relationships** — foreign key constraints between entities
+- **Performance** — indexed queries and WAL mode for concurrency
+- **Testing** — in-memory database for fast, isolated unit tests
 
 ## Database Structure
 
-The database consists of the following tables:
-
-- `suppliers` - Supplier information
-- `headquarters` - Company headquarters data
-- `branches` - Branch locations (linked to headquarters)
-- `products` - Product catalog (linked to suppliers)
-- `orders` - Customer orders (linked to branches)
-- `order_details` - Order line items (linked to orders and products)
-- `deliveries` - Delivery tracking (linked to suppliers)
-- `order_detail_deliveries` - Junction table for order-delivery relationships
-- `migrations` - Database schema version tracking
+| Table | Description |
+|---|---|
+| `suppliers` | Supplier information |
+| `headquarters` | Company headquarters data |
+| `branches` | Branch locations (linked to headquarters) |
+| `products` | Product catalog (linked to suppliers) |
+| `orders` | Customer orders (linked to branches) |
+| `order_details` | Order line items (linked to orders and products) |
+| `deliveries` | Delivery tracking (linked to suppliers) |
+| `order_detail_deliveries` | Junction table for order-delivery relationships |
+| `migrations` | Schema version tracking |
 
 ## Getting Started
 
-### 1. Database Initialization
+### 1. Automatic Initialization
 
-When you start the server for the first time, the database will be automatically initialized:
+When you start the API, migrations and seeds are applied automatically:
 
 ```bash
-make dev
+cd src/api-py
+uvicorn main:app --reload --port 3000
 ```
 
 This will:
+- Create the SQLite database file at `api-py/data/app.db`
+- Run all pending migrations (tracked in the `migrations` table)
+- Seed the database with sample data if the tables are empty
 
-- Create the SQLite database file at `api-ts/data/app.db`
-- Run all pending migrations
-- Seed the database with sample data (if empty)
+### 2. Database Location
 
-### 2. Manual Database Management
+| Environment | Path |
+|---|---|
+| Development | `api-py/data/app.db` |
+| Testing | `:memory:` (in-memory, per test) |
 
-You can also manage the database manually from the root directory:
-
-```bash
-# Initialize database schema (runs migrations)
-make db-init
-
-# Seed the database with sample data
-make db-seed
-```
-
-Alternatively, if you're in the `api-ts/` directory, you can use npm commands directly:
-
-```bash
-cd api-ts
-npm run db:init
-npm run db:seed
-```
-
-### 3. Database Location
-
-The database file is stored at:
-
-- **Development**: `api-ts/data/app.db`
-- **Testing**: In-memory (`:memory:`)
-
-You can override the database location using the `DB_FILE` environment variable:
+Override with the `DB_FILE` environment variable:
 
 ```bash
 export DB_FILE=/path/to/your/database.db
@@ -77,192 +57,165 @@ export DB_FILE=/path/to/your/database.db
 
 ## Repository Pattern
 
-The API uses the Repository pattern to interact with the database:
+The API uses a Repository pattern to isolate database access from route handlers.
 
-### Using Repositories
+### Example — Suppliers Repository
 
-```typescript
-import { getSuppliersRepository } from './repositories/suppliersRepo';
+```python
+from repositories.suppliers_repo import SuppliersRepository
 
-const repo = await getSuppliersRepository();
+repo = SuppliersRepository(db_connection)
 
-// Get all suppliers
-const suppliers = await repo.findAll();
+# Get all suppliers
+suppliers = repo.find_all()
 
-// Get supplier by ID
-const supplier = await repo.findById(1);
+# Get by ID (raises NotFoundError if missing)
+supplier = repo.find_by_id(1)
 
-// Create new supplier
-const newSupplier = await repo.create({
-    name: 'New Supplier',
-    description: 'Description',
-    contactPerson: 'John Doe',
-    email: 'john@example.com',
-    phone: '555-1234'
-});
+# Create
+new_supplier = repo.create({
+    "name": "New Supplier",
+    "description": "Description",
+    "contact_person": "Jane Doe",
+    "email": "jane@example.com",
+    "phone": "555-1234"
+})
 
-// Update supplier
-const updated = await repo.update(1, { name: 'Updated Name' });
+# Update
+updated = repo.update(1, {"name": "Updated Name"})
 
-// Delete supplier
-await repo.delete(1);
+# Delete
+repo.delete(1)
 
-// Search by name
-const results = await repo.findByName('Tech');
+# Search by name
+results = repo.find_by_name("Tech")
 ```
 
 ### Repository Features
 
-- **Type Safety** - Full TypeScript support
-- **Error Handling** - Proper error types (NotFoundError, ValidationError, etc.)
-- **SQL Injection Protection** - Parameterized queries
-- **Automatic Mapping** - Converts between snake_case (database) and camelCase (JavaScript)
+- **Type safety** — Pydantic models for all inputs and outputs
+- **Error handling** — domain error types (`NotFoundError`, `ValidationError`, `ConflictError`)
+- **SQL injection protection** — parameterized queries via `sqlite3` placeholders (`?`)
+- **Consistent naming** — `snake_case` in Python maps directly to `snake_case` SQL columns
 
 ## Database Schema Management
 
 ### Migrations
 
-Database schema changes are managed through migration files:
+Schema changes are managed through sequential SQL files:
 
-1. Create a new migration file: `src/database/migrations/002_description.sql`
-2. Add your SQL statements
-3. Run migrations: `make db-init` (or `cd api-ts && npm run db:migrate`)
+1. Create a new file: `src/database/migrations/00N_description.sql`
+2. Write idempotent SQL (use `IF NOT EXISTS` or equivalent where possible)
+3. Restart the API — migrations run automatically on startup
 
-Migration files are executed in order and tracked in the `migrations` table.
+Migration files are executed in lexicographic order and recorded in the `migrations` table; already-applied migrations are skipped.
 
 ### Seed Data
 
-Sample data is provided through seed files in `src/database/seed/`:
+Sample data lives in `src/database/seed/`:
 
-- `001_suppliers.sql` - Supplier data
-- `002_headquarters.sql` - Headquarters data
-- `003_branches.sql` - Branch data
-- `004_products.sql` - Product catalog
+| File | Contents |
+|---|---|
+| `001_suppliers.sql` | Supplier records |
+| `002_headquarters.sql` | Headquarters records |
+| `003_branches.sql` | Branch records |
+| `004_products.sql` | Product catalog |
+
+Seeds are applied once when the target tables are empty.
 
 ## Testing Strategy
 
-### Unit Tests
+### Unit Tests (Repository Layer)
 
-Repositories are tested using mocked database connections:
+Use an in-memory database to test repository methods in isolation:
 
-```typescript
-import { vi } from 'vitest';
-import { SuppliersRepository } from '../repositories/suppliersRepo';
+```python
+import sqlite3
+import pytest
+from repositories.suppliers_repo import SuppliersRepository
+from utils.db import run_migrations
 
-// Mock database
-const mockDb = {
-    run: vi.fn(),
-    get: vi.fn(),
-    all: vi.fn(),
-    close: vi.fn()
-};
+@pytest.fixture
+def db():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    run_migrations(conn)
+    yield conn
+    conn.close()
 
-// Test repository methods
-const repo = new SuppliersRepository(mockDb);
+def test_find_all_empty(db):
+    repo = SuppliersRepository(db)
+    assert repo.find_all() == []
 ```
 
-### Integration Tests
+### Integration Tests (Route Layer)
 
-For integration tests, use an in-memory database:
+Use FastAPI's `TestClient` to test routes end-to-end against an in-memory DB:
 
-```typescript
-import { getDatabase } from '../db/sqlite';
+```python
+from fastapi.testclient import TestClient
+from main import app
 
-const db = await getDatabase(true); // true = test mode (in-memory)
+client = TestClient(app)
+
+def test_get_suppliers():
+    response = client.get("/suppliers")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
 ```
 
 ## Configuration
 
-Database configuration is managed in `api-ts/src/db/config.ts`:
+Database configuration is read from environment variables in `src/api-py/utils/db.py`:
 
-```typescript
-export const DB_CONFIG = {
-    DB_FILE: process.env.DB_FILE || './data/app.db',
-    DB_ENGINE: process.env.DB_ENGINE || 'sqlite',
-    ENABLE_WAL: process.env.DB_ENABLE_WAL !== 'false',
-    TIMEOUT: parseInt(process.env.DB_TIMEOUT || '30000'),
-    FOREIGN_KEYS: process.env.DB_FOREIGN_KEYS !== 'false'
-};
-```
-
-### Environment Variables
-
-- `DB_FILE` - Database file path (default: `./data/app.db`)
-- `DB_ENGINE` - Database engine (default: `sqlite`)
-- `DB_ENABLE_WAL` - Enable WAL mode (default: `true`)
-- `DB_TIMEOUT` - Connection timeout in ms (default: `30000`)
-- `DB_FOREIGN_KEYS` - Enable foreign key constraints (default: `true`)
+| Variable | Default | Description |
+|---|---|---|
+| `DB_FILE` | `./data/app.db` | Path to SQLite database file |
+| `DB_MIGRATIONS_DIR` | `../database/migrations` | Path to migration SQL files |
+| `DB_FOREIGN_KEYS` | `true` | Enforce foreign key constraints (`PRAGMA foreign_keys`) |
 
 ## Error Handling
 
-The system provides specialized error types:
+The repository layer raises typed domain errors that route handlers catch and convert to HTTP responses:
 
-- `DatabaseError` - General database errors
-- `NotFoundError` - Entity not found (404)
-- `ValidationError` - Invalid data (400)
-- `ConflictError` - Constraint violations (409)
-
-These errors are automatically handled by the Express error middleware and return appropriate HTTP status codes.
+| Error | HTTP Status |
+|---|---|
+| `NotFoundError` | 404 |
+| `ValidationError` | 400 |
+| `ConflictError` | 409 |
+| `DatabaseError` | 500 |
 
 ## Performance Considerations
 
-The database includes several optimizations:
-
-- **Indexes** - On foreign keys and frequently queried columns
-- **WAL Mode** - Better concurrency for read/write operations
-- **Connection Pooling** - Reuses database connections
-- **Query Optimization** - Parameterized queries prevent SQL injection
+- **Indexes** — defined in migrations on all FK columns and frequently filtered columns
+- **WAL Mode** — enabled via `PRAGMA journal_mode=WAL` for better read/write concurrency
+- **Parameterized queries** — prevent SQL injection and allow the SQLite query planner to cache plans
+- **Connection reuse** — a single connection is opened per request (or shared at app startup for simple deployments)
 
 ## Backup and Recovery
 
-Since SQLite stores data in a single file, backup is straightforward:
+SQLite stores all data in a single file — backup is straightforward:
 
 ```bash
-# Backup database
-cp api-ts/data/app.db api-ts/data/app-backup-$(date +%Y%m%d).db
+# Backup
+cp src/api-py/data/app.db src/api-py/data/app-backup-$(date +%Y%m%d).db
 
-# Restore from backup
-cp api-ts/data/app-backup-20231225.db api-ts/data/app.db
+# Restore
+cp src/api-py/data/app-backup-20240101.db src/api-py/data/app.db
 ```
-
-For production deployments, consider regular automated backups.
 
 ## Troubleshooting
 
-### Common Issues
-
-1. **Database locked**: Usually caused by long-running transactions or unclosed connections
-   - Solution: Ensure all database operations are properly awaited and connections are closed
-
-2. **Foreign key constraint errors**: Trying to reference non-existent records
-   - Solution: Ensure referenced records exist before creating relationships
-
-3. **Migration errors**: SQL syntax errors or conflicting schema changes
-   - Solution: Check migration file syntax and ensure compatibility with existing schema
+| Symptom | Cause | Fix |
+|---|---|---|
+| `database is locked` | Long-running transaction or unclosed connection | Ensure all operations are committed/closed; use context managers |
+| Foreign key constraint error | Inserting a child row before its parent exists | Insert parent records first; confirm FK pragma is ON |
+| Migration not applied | New file not in lexicographic order, or already tracked | Check `migrations` table; ensure new file sorts after the last applied |
 
 ### Debug Mode
 
-Enable verbose SQLite logging:
+Enable SQL query logging by setting `LOG_LEVEL=DEBUG` or adding Python `logging` configuration in `main.py`:
 
 ```bash
-NODE_ENV=development make dev
+LOG_LEVEL=DEBUG uvicorn main:app --reload --port 3000
 ```
-
-This will show all SQL queries being executed.
-
-## Next Steps
-
-The current implementation includes:
-
-- ✅ Complete SQLite infrastructure
-- ✅ Suppliers repository and routes
-- ✅ Migration and seeding system
-- ✅ Unit tests with mocking
-
-Still to implement:
-
-- [ ] Repositories for remaining entities (products, orders, etc.)
-- [ ] Route migration for remaining endpoints
-- [ ] Integration tests
-- [ ] Docker configuration updates
-- [ ] Production deployment considerations

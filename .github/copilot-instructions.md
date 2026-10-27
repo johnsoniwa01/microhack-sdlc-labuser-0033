@@ -3,14 +3,10 @@
 These are repository-wide guidelines. Path‑scoped files in `.github/instructions/*.instructions.md` provide focused guidance for specific areas (frontend, API, database).
 
 ## High-Level Architecture
-Multi-language monorepo under `src/` implementing the OctoCAT Supply Chain app. It ships FOUR interchangeable implementations of the same OctoCAT Supply API plus a shared UI and database:
-- `src/api-ts` Express REST API in TypeScript (SQLite persistence, repository pattern, Swagger docs)
-- `src/api-cs` ASP.NET REST API in C#
-- `src/api-py` FastAPI REST API in Python
-- `src/api-java` Spring Boot REST API in Java
-- `src/frontend` React + Vite + Tailwind UI (shared across all API variants)
-- `src/database` SQLite schema — `src/database/migrations/` and `src/database/seed/`
-- `src/Makefile` orchestrates install/build/test/dev across the languages
+Monorepo under `src/` implementing the OctoCAT Supply Chain app with a Python FastAPI backend and a shared React frontend:
+- `src/api-py` — FastAPI REST API in Python (the **only** backend implementation)
+- `src/frontend` — React + Vite + Tailwind UI
+- `src/database` — SQLite schema: `src/database/migrations/` and `src/database/seed/`
 
 Refer to `src/docs/architecture.md` and `src/docs/sqlite-integration.md` for deeper details. Avoid restating them in reviews and link instead.
 
@@ -18,16 +14,17 @@ Refer to `src/docs/architecture.md` and `src/docs/sqlite-integration.md` for dee
 When generating suggestions:
 1. Prefer incremental, minimal diffs; preserve existing style and naming.
 2. Surface security, correctness, and data integrity issues before micro-optimizations.
-3. Encourage type safety (no `any` unless justified). Suggest adding/refining model or DTO types when gaps appear.
+3. Encourage type safety — use Pydantic models for all request/response shapes; avoid untyped `dict` returns where a schema can be defined.
 4. Reduce duplication: when the same logic appears in multiple places, suggest extracting it into a shared utility or repository method.
-5. Ensure error handling uses existing custom error types where appropriate (e.g., NotFound, Validation, Conflict) and propagates consistent HTTP status codes via middleware.
-6. Encourage tests: request unit tests for new repository logic and component tests (or at least React Testing Library coverage) for critical UI paths.
-7. For performance concerns, highlight N+1 query patterns, unnecessary data loading, or large bundle additions.
+5. Ensure error handling uses existing custom error types where appropriate (e.g., NotFound, Validation, Conflict) and propagates consistent HTTP status codes via FastAPI's `HTTPException` or exception handlers.
+6. Encourage tests: request unit tests for new repository logic (using an in-memory SQLite DB) and `TestClient` integration tests for new routes.
+7. For performance concerns, highlight N+1 query patterns, unnecessary data loading, or missing indexes.
 8. Prefer environment variable driven configuration; avoid hard‑coded paths/secrets.
 
-## Monorepo Workflow
-- Build and test via the `src/Makefile` (run targets from `src/`): `make build` / `make test` / `make dev` cover all variants, and per-language targets like `make build-ts`, `make test-ts`, `make dev-ts` scope to one implementation.
-- Install dependencies with the install targets: `make install` (everything) or per-language `make install-ts`, `make install-cs`, `make install-py`, `make install-java`, `make install-frontend`.
+## Workflow
+- Install dependencies: `pip install -r requirements.txt` from `src/api-py/`.
+- Run API in dev mode: `uvicorn main:app --reload --port 3000` from `src/api-py/`.
+- Run frontend: `npm run dev` from `src/frontend/`.
 - Keep PRs scoped: code + tests + docs (architecture or build notes) when behavior changes.
 - Update related instruction files if new folders or architectural slices are introduced.
 
